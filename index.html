@@ -1,0 +1,291 @@
+v<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Maths AR:Explorer</title>
+
+  <!-- External CSS -->
+  <link rel="stylesheet" href="style.css">
+
+  <style>
+    /* Base styles */
+    html, body {height:100%;margin:0;padding:0;font-family:"Arial", sans-serif;background:#000;color:#dffaff;}
+    .app { display:flex; gap:16px; padding:16px; min-height:100vh; align-items:flex-start; justify-content:center; }
+    .stage { position:relative; width:100%; max-width:1000px; height:60vh; min-height:320px; background:#020202; border-radius:12px; overflow:hidden; border:2px solid #00eaff; }
+    video { width:100%; height:100%; object-fit:cover; transform: scaleX(-1); background:#000; }
+    canvas.overlay { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; }
+    .panel { width:340px; min-width:260px; background:#030b15; padding:18px; border-radius:12px; border:2px solid #8b00ff; }
+    h2 { text-align:center; color:#00eaff; margin-bottom:8px; }
+    .grid { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:14px; }
+    .cell { width:28px; height:28px; border-radius:6px; background:#1b1b1b; border:1px solid #222; box-shadow:inset 0 0 5px #000; }
+    .cell.filled { background:#00eaff; box-shadow:0 0 12px #00eaff, inset 0 0 12px #00eaff; }
+    .btn { margin-top:12px; width:100%; padding:10px; font-size:15px; background:#8b00ff; color:white; border:none; border-radius:8px; cursor:pointer; box-shadow:0 0 15px rgba(139,0,255,0.12); transition: transform .18s; }
+    .btn:hover { transform:translateY(-3px); box-shadow:0 0 25px rgba(139,0,255,0.18); }
+
+    /* Kids Mode Styles */
+    body.kids {
+      background: linear-gradient(135deg, #ffecd2, #fcb69f, #ff9a9e, #fad0c4);
+      color: #2b2b2b;
+      font-family: "Comic Sans MS", "Chalkboard", sans-serif;
+      transition: background 0.8s;
+    }
+    body.kids .panel { background: #fff3ea; border: 3px solid #ff7a59; box-shadow:0 8px 20px rgba(0,0,0,0.06);}
+    body.kids h2 { color:#ff7a59; text-shadow:0 2px 6px rgba(0,0,0,0.1); font-size:20px; }
+    body.kids label { color:#2b2b2b; font-size:18px; }
+    body.kids input[type=number] { border:2px dashed #ff7a59; background:#fff; color:#2b2b2b; padding:10px; font-size:18px; }
+    body.kids .grid { grid-template-columns: repeat(4,1fr); gap:10px; }
+    body.kids .cell { width:100%; height:56px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:bold; color:#fff; background:linear-gradient(180deg,#ffe8d7,#ffd2c3); box-shadow:0 6px 12px rgba(0,0,0,0.06); transition: all 0.2s; }
+    body.kids .cell.filled { background: linear-gradient(180deg,#ff7a59,#ffb08a); transform: scale(1.05); box-shadow:0 8px 25px rgba(0,0,0,0.15); text-shadow:0 2px 6px rgba(0,0,0,0.15); }
+    .kids-btn { background: linear-gradient(90deg,#ff7a59,#ffb08a); color:#fff; font-weight:bold; border:none; border-radius:20px; padding:14px; font-size:18px; box-shadow:0 6px 25px rgba(0,0,0,0.1); cursor:pointer; animation: bounce 1s infinite; transition: transform 0.2s; }
+    .kids-btn:hover { transform: scale(1.1); }
+    @keyframes bounce { 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-8px) } }
+
+    /* Christmas Lights */
+    .christmas-lights { position: fixed; top:0; left:0; width:100%; display:flex; justify-content:space-between; padding:12px 0; z-index:99999; }
+    .light-bulb { width:18px; height:28px; border-radius:50%; animation: glow 1.2s infinite alternate; }
+    @keyframes glow { 0% { opacity:0.5; transform:scale(1); } 100% { opacity:1; transform:scale(1.25); } }
+
+  </style>
+</head>
+<body>
+
+<div class="christmas-lights" id="lights"></div>
+
+<button id="gameBtn">Game Mode 🎮</button>
+<button id="kidsBtn">Kids Mode 🧸</button>
+<button id="rateBtn">⭐ Rate</button>
+
+<div class="app">
+  <div class="stage" id="stage">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay" class="overlay"></canvas>
+  </div>
+
+  <div class="panel">
+    <h2 id="title">AR Fractions (Neon)</h2>
+    <p><b>Object:</b> <span id="objName">—</span></p>
+    <p><b>Confidence:</b> <span id="conf">—</span></p>
+    <p><b>Fraction:</b> <span id="fraction">—</span></p>
+    <p><b>Percentage:</b> <span id="percent">—</span></p>
+
+    <label>Grid Cells:
+      <input id="gridCount" type="number" min="2" max="48" value="12" />
+    </label>
+    <div id="grid" class="grid"></div>
+
+    <button id="creatorBtn" class="btn">Creators</button>
+    <button id="speakBtn" class="btn">🔊 Speak Explanation</button>
+
+    <div id="creatorNames" style="display:none">
+      <p><b>Kadhirnelavan SR</b></p>
+      <p><b>Trishanth S</b></p>
+    </div>
+
+    <div id="funFact"></div>
+    <div id="steps"></div>
+
+    <div id="gamePanel">
+      <p><b>Level:</b> <span id="gameLevel">1</span></p>
+      <p><b>Time:</b> <span id="gameTime">60</span>s</p>
+      <p><b>Score:</b> <span id="gameScore">0</span></p>
+      <p><b>Target:</b> <span id="gameTarget">8</span></p>
+      <p><b>High Score:</b> <span id="highScore">0</span></p>
+    </div>
+  </div>
+</div>
+
+<div id="overlayPopup"></div>
+
+<!-- Snow + Lights -->
+<script>
+function createSnow(){
+  const snow=document.createElement('div');
+  snow.className='snowflake';
+  snow.textContent='❆';
+  snow.style.left=Math.random()*100+'vw';
+  snow.style.fontSize=(Math.random()*10+10)+'px';
+  snow.style.animationDuration=(Math.random()*3+2)+'s';
+  document.body.appendChild(snow);
+  setTimeout(()=>snow.remove(),6000);
+}
+setInterval(createSnow,170);
+
+const lights=document.getElementById("lights");
+const colors=['red','yellow','green','blue','pink'];
+for(let i=0;i<30;i++){
+  let bulb=document.createElement("div");
+  bulb.className="light-bulb";
+  bulb.style.background=colors[i%colors.length];
+  bulb.style.animationDelay=(i*0.1)+"s";
+  lights.appendChild(bulb);
+}
+</script>
+
+<!-- TensorFlow -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
+
+<!-- Main JS -->
+<script>
+// ✅ Camera, detection, grid & AR stickers
+const video=document.getElementById('video');
+const overlay=document.getElementById('overlay');
+const ctx=overlay.getContext('2d');
+const objName=document.getElementById('objName');
+const conf=document.getElementById('conf');
+const fractionText=document.getElementById('fraction');
+const percentText=document.getElementById('percent');
+const grid=document.getElementById('grid');
+const gridCountInput=document.getElementById('gridCount');
+const creatorBtn=document.getElementById('creatorBtn');
+const creatorNames=document.getElementById('creatorNames');
+const speakBtn=document.getElementById('speakBtn');
+const stepsDiv=document.getElementById('steps');
+const funFactBox=document.getElementById('funFact');
+const kidsBtn=document.getElementById('kidsBtn');
+const title=document.getElementById('title');
+
+let model=null;
+let smoothRatio=0;
+const SMOOTH_FACTOR=0.14;
+let kidsMode=false;
+
+let stickerMap={
+  "person":"🧒","bottle":"🍼","cup":"☕","cell phone":"📱","book":"📘",
+  "remote":"🎮","chair":"🪑","laptop":"💻","mouse":"🖱️","keyboard":"⌨️",
+  "clock":"🕰️","banana":"🍌","orange":"🍊","scissors":"✂️"
+};
+
+let funFacts={
+  "bottle":"Bottles keep us hydrated! 💧",
+  "cup":"Cups hold drinks. ☕",
+  "book":"Books are full of stories! 📚",
+  "cell phone":"Phones help you learn online! 📱",
+  "person":"People are unique! 🧒",
+  "laptop":"Laptops help with school! 💻",
+  "chair":"Chairs help us sit comfortably! 🪑"
+};
+
+// Grid drawing
+function drawGrid(total,filled){
+  grid.innerHTML="";
+  total=Math.max(2,Math.min(48,total||12));
+  const cols=Math.min(kidsMode?4:6,Math.ceil(total/2));
+  grid.style.gridTemplateColumns=`repeat(${cols},1fr)`;
+  for(let i=0;i<total;i++){
+    const c=document.createElement('div');
+    c.className='cell'+(i<filled?' filled':'');
+    grid.appendChild(c);
+  }
+}
+
+// Overlay and stickers
+function clearOverlay(){ ctx.clearRect(0,0,overlay.width,overlay.height); }
+function drawBoxAndSticker(bbox,label,score){
+  ctx.clearRect(0,0,overlay.width,overlay.height);
+  if(!bbox) return;
+  const [x,y,w,h]=bbox;
+  ctx.save();
+  ctx.lineWidth=kidsMode?6:3;
+  ctx.strokeStyle=kidsMode?'rgba(255,122,89,0.95)':'#00eaff';
+  ctx.shadowColor=kidsMode?'rgba(255,200,150,0.6)':'#00eaff';
+  ctx.shadowBlur=kidsMode?24:18;
+  ctx.strokeRect(x,y,w,h);
+  ctx.fillStyle=kidsMode?'rgba(255,122,89,0.12)':'rgba(0,234,255,0.12)';
+  ctx.fillRect(x,y,w,h);
+  const sticker=stickerMap[label]||"⭐";
+  const fontSize=Math.max(20,Math.round(h/3));
+  ctx.font=`${fontSize}px serif`;
+  ctx.fillStyle=kidsMode?'#2b2b2b':'#00eaff';
+  const tx=x+w-(fontSize+12), ty=y+fontSize+4;
+  ctx.fillText(sticker,tx,ty);
+  // Sparkles in kids mode
+  if(kidsMode){
+    ctx.fillStyle='rgba(255,255,0,0.6)';
+    for(let i=0;i<5;i++){
+      ctx.beginPath();
+      ctx.arc(x+Math.random()*w,y+Math.random()*h,Math.random()*8+4,0,2*Math.PI);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+// Camera
+async function startCamera(){
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}});
+    video.srcObject=stream;
+    await new Promise(res=>video.onloadedmetadata=res);
+    resizeCanvas();
+    window.addEventListener('resize',resizeCanvas);
+  }catch(err){ alert('Camera access denied. Reload and allow camera.'); console.error(err);}
+}
+function resizeCanvas(){ overlay.width=video.videoWidth||640; overlay.height=video.videoHeight||480; ctx.setTransform(-1,0,0,1,overlay.width,0); }
+
+// Load TF model
+async function loadModelAndStart(){
+  model=await cocoSsd.load();
+  drawGrid(parseInt(gridCountInput.value),0);
+  requestAnimationFrame(detectFrame);
+}
+async function detectFrame(){
+  if(video.readyState>=2){
+    const predictions=await model.detect(video);
+    handlePredictions(predictions);
+  }
+  requestAnimationFrame(detectFrame);
+}
+function handlePredictions(predictions){
+  if(!predictions||predictions.length===0){
+    clearOverlay(); objName.innerText='—'; conf.innerText='—'; fractionText.innerText='—'; percentText.innerText='—';
+    drawGrid(parseInt(gridCountInput.value),0); return;
+  }
+  const best=predictions.reduce((a,b)=>a.score>b.score?a:b);
+  const label=best.class, score=best.score||0, bbox=best.bbox||[0,0,0,0];
+  const frameArea=overlay.width*overlay.height, boxArea=bbox[2]*bbox[3];
+  smoothRatio=smoothRatio*(1-SMOOTH_FACTOR)+boxArea/frameArea*SMOOTH_FACTOR;
+  const gridTotal=Math.max(2,Math.min(48,parseInt(gridCountInput.value)||12));
+  const filled=Math.round(smoothRatio*gridTotal);
+  const num=Math.max(0,Math.min(gridTotal,filled)), den=gridTotal;
+  objName.innerText=label; conf.innerText=(score*100).toFixed(0)+'%'; fractionText.innerText=`${num}/${den}`;
+  percentText.innerText=(smoothRatio*100).toFixed(1)+'%';
+  drawGrid(gridTotal,filled);
+  drawBoxAndSticker(bbox,label,score);
+  funFactBox.style.display=kidsMode&&funFacts[label]?'block':'none';
+  if(kidsMode&&funFacts[label]) funFactBox.innerText=funFacts[label];
+}
+
+// Initialize
+async function init(){ await startCamera(); await loadModelAndStart(); }
+init();
+
+// Grid input change
+gridCountInput.addEventListener('change',()=>{ drawGrid(Math.max(2,Math.min(48,parseInt(gridCountInput.value)||12)),0); });
+
+// Kids Mode toggle
+kidsBtn.addEventListener('click',()=>{
+  kidsMode=!kidsMode;
+  document.body.classList.toggle('kids',kidsMode);
+  kidsBtn.textContent=kidsMode?"Kids Mode 🧸 ON":"Kids Mode 🧸";
+  title.textContent=kidsMode?"Maths AR: Explorer — Kids Mode":"AR Fractions (Neon)";
+  speakBtn.classList.toggle('kids-btn',kidsMode); creatorBtn.classList.toggle('kids-btn',kidsMode);
+  drawGrid(parseInt(gridCountInput.value)||12,0);
+});
+
+// Speak explanation
+speakBtn.addEventListener('click',()=>{
+  const ft=fractionText.innerText; if(!ft||ft==='—') return;
+  const [a,b]=ft.split('/').map(Number); if(isNaN(a)||isNaN(b)) return;
+  const perc=percentText.innerText;
+  const steps=[`The object covers ${perc} of the screen.`,'Fraction: '+ft];
+  const u=new SpeechSynthesisUtterance(steps.join(' '));
+  u.rate=kidsMode?0.75:0.95; u.pitch=kidsMode?1.1:1.0;
+  speechSynthesis.speak(u);
+});
+</script>
+
+</body>
+</html>
+
